@@ -1,0 +1,31 @@
+{
+    "namespace": "Network",
+
+    "bridge_functions": [
+        {
+            "name": "Network.Status",
+            "android": "com.nativephp.network.NetworkFunctions.Status",
+            "ios": "NetworkFunctions.Status",
+            "description": "Get the current network connection status"
+        }
+    ],
+
+    "android": {
+        "permissions": [
+            "android.permission.ACCESS_NETWORK_STATE"
+        ],
+        "dependencies": {
+            "implementation": []
+        }
+    },
+
+    "ios": {
+        "info_plist": {},
+        "dependencies": {
+            "swift_packages": [],
+            "pods": []
+        }
+    },
+
+    "events": []
+}
