@@ -11,6 +11,7 @@
     ],
 
     "android": {
+        "min_version": 33,
         "permissions": [
             "android.permission.ACCESS_NETWORK_STATE"
         ],
@@ -20,6 +21,7 @@
     },
 
     "ios": {
+        "min_version": "18.2",
         "info_plist": {},
         "dependencies": {
             "swift_packages": [],
