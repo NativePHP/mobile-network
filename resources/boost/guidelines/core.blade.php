@@ -2,116 +2,49 @@
 
 Network connectivity status monitoring for NativePHP Mobile applications.
 
-### Installation
-
-```bash
-composer require nativephp/network
-php artisan native:plugin:register nativephp/network
-```
-
 ### PHP Usage (Livewire/Blade)
-
-Use the `Network` facade:
 
 @verbatim
 <code-snippet name="Network Status" lang="php">
 use Native\Mobile\Facades\Network;
 
-// Get current network status
 $status = Network::status();
-
-if ($status->connected) {
-    echo "Connected via: " . $status->type;
-
-    if ($status->isExpensive) {
-        echo " (metered connection)";
-    }
-} else {
-    echo "No network connection";
+if ($status) {
+    echo $status->connected;      // true/false
+    echo $status->type;           // "wifi", "cellular", "ethernet", or "unknown"
+    echo $status->isExpensive;    // true/false (iOS only)
+    echo $status->isConstrained;  // true/false (iOS only)
 }
 </code-snippet>
 @endverbatim
 
-@verbatim
-<code-snippet name="Conditional Data Sync" lang="php">
-use Native\Mobile\Facades\Network;
-use Native\Mobile\Facades\Dialog;
-
-public function syncData()
-{
-    $status = Network::status();
-
-    if (!$status->connected) {
-        Dialog::toast('No internet connection');
-        return;
-    }
-
-    if ($status->isExpensive) {
-        // On cellular - sync only essential data
-        $this->syncEssentialData();
-    } else {
-        // On WiFi - full sync
-        $this->syncAllData();
-    }
-}
-</code-snippet>
-@endverbatim
-
-### JavaScript Usage
+### JavaScript Usage (Vue/React/Inertia)
 
 @verbatim
-<code-snippet name="Network Status in JavaScript" lang="js">
-import { network, dialog } from '#nativephp';
+<code-snippet name="Network Status in JavaScript" lang="javascript">
+import { network } from '#nativephp';
 
-// Get current network status
 const status = await network.status();
-
-if (status.connected) {
-    console.log(`Connected via: ${status.type}`);
-
-    if (status.isExpensive) {
-        console.log('Warning: metered connection');
-    }
-} else {
-    console.log('No network connection');
-}
-
-// Example: Warn before large download on cellular
-async function downloadLargeFile() {
-    const status = await network.status();
-
-    if (status.isExpensive && status.type === 'cellular') {
-        dialog.alert(
-            'Large Download',
-            'This file is 50MB. Download on cellular data?',
-            ['Cancel', 'Download']
-        );
-        return;
-    }
-
-    startDownload();
+if (status) {
+    console.log(status.connected);      // true/false
+    console.log(status.type);           // "wifi", "cellular", "ethernet", or "unknown"
+    console.log(status.isExpensive);    // true/false (iOS only)
+    console.log(status.isConstrained);  // true/false (iOS only)
 }
 </code-snippet>
 @endverbatim
-
-### Available Methods
-
-- `Network::status()` - Get current network connectivity status
 
 ### Response Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `connected` | boolean | Whether device has network connectivity |
-| `type` | string | Connection type: `wifi`, `cellular`, `ethernet`, or `unknown` |
-| `isExpensive` | boolean | Whether connection is metered (e.g., cellular data) |
-| `isConstrained` | boolean | Whether Low Data Mode is enabled (iOS only) |
+| connected | bool | Device network connection state |
+| type | string | Connection type: "wifi", "cellular", "ethernet", "unknown" |
+| isExpensive | bool | Metered/cellular connection (iOS only; false on Android) |
+| isConstrained | bool | Low Data Mode status (iOS only; false on Android) |
 
-### Platform Details
+### Notes
 
-- **Android**: Uses `ConnectivityManager` and `NetworkCapabilities`
-  - `isConstrained` is always `false` (not applicable)
-  - Requires `ACCESS_NETWORK_STATE` permission (added automatically)
-- **iOS**: Uses `NWPathMonitor` from Network framework
-  - `isConstrained` reflects Low Data Mode setting
-  - No special permissions required
+- Returns current state only; not a real-time stream
+- No event system - must call directly or implement periodic checks
+- Requires `network_state` permission (enabled by default)
