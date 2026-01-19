@@ -1,6 +1,5 @@
 {
     "name": "nativephp/mobile-network",
-    "version": "0.0.4",
     "description": "Network connectivity status plugin for NativePHP Mobile",
     "type": "nativephp-plugin",
     "license": "MIT",
