@@ -128,7 +128,3 @@ async function downloadLargeFile() {
 - Uses `NWPathMonitor` from Network framework
 - `isConstrained` reflects Low Data Mode setting
 - No special permissions required
-
-## License
-
-MIT
