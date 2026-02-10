@@ -36,10 +36,10 @@ if ($status->connected) {
 ### JavaScript (Vue/React/Inertia)
 
 ```js
-import { network } from '#nativephp';
+import { Network } from '#nativephp';
 
 // Get current network status
-const status = await network.status();
+const status = await Network.status();
 
 if (status.connected) {
     console.log(`Connected via: ${status.type}`);
@@ -75,7 +75,7 @@ public function syncData()
     $status = Network::status();
 
     if (!$status->connected) {
-        Dialog::toast('No internet connection');
+        // Handle no connection
         return;
     }
 
@@ -92,28 +92,22 @@ public function syncData()
 ### JavaScript Connection Check
 
 ```js
-import { network, dialog } from '#nativephp';
+import { Network } from '#nativephp';
 
-async function downloadLargeFile() {
-    const status = await network.status();
+async function checkBeforeDownload() {
+    const status = await Network.status();
 
     if (!status.connected) {
-        dialog.toast('No internet connection');
-        return;
+        console.log('No internet connection');
+        return false;
     }
 
     if (status.isExpensive && status.type === 'cellular') {
-        // Warn user about large download on cellular
-        dialog.alert(
-            'Large Download',
-            'This file is 50MB. Download on cellular data?',
-            ['Cancel', 'Download']
-        );
-        return;
+        console.log('On cellular data - consider warning user');
+        return false;
     }
 
-    // Proceed with download
-    startDownload();
+    return true;
 }
 ```
 
