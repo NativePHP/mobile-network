@@ -122,3 +122,40 @@ async function checkBeforeDownload() {
 - Uses `NWPathMonitor` from Network framework
 - `isConstrained` reflects Low Data Mode setting
 - No special permissions required
+
+## Testing
+
+The plugin extends the NativePHP testing suite with network-specific helpers, so your app tests can fake connectivity and assert it was checked without knowing any bridge internals:
+
+```php
+use Native\Mobile\Testing\Native;
+
+it('syncs everything on wifi', function () {
+    Native::fakeBridge()->withWifi();
+
+    Native::test(SyncButton::class)
+        ->tap('Sync now')
+        ->assertNetworkChecked();
+});
+
+it('warns instead of syncing when offline', function () {
+    Native::fakeBridge()->withOffline();
+
+    Native::test(SyncButton::class)
+        ->tap('Sync now')
+        ->assertSee('No connection');
+});
+```
+
+### Helpers
+
+- `withNetworkStatus(array $status = [])` — fake the raw response to `status()`. Accepts any of `connected`, `type`, `isExpensive`, `isConstrained`, `error` — the same fields the native bridge returns.
+- `withWifi(array $extra = [])` — fake a connected, unmetered, unconstrained Wi-Fi status. Pass `$extra` to override individual fields.
+- `withCellular(array $extra = [])` — fake a connected, metered cellular status.
+- `withOffline(array $extra = [])` — fake a disconnected status (`type: 'unknown'`).
+- `withError(string $error = 'Unknown error', array $extra = [])` — fake the native error path (e.g. an Android catch reporting failure to read connectivity state).
+- `assertNetworkChecked()` — assert `status()` was called.
+
+The helpers are available on `Native::fakeBridge()` and chain directly off `Native::test(...)`. They register automatically while running tests (requires a core with a macroable FakeBridge; on older cores they simply don't register).
+
+Note that `status()` decodes the bridge's JSON response without the `true` flag, so it returns a `stdClass` object (`$status->type`), not an array — the same is true of the objects returned while faked.
