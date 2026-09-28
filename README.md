@@ -62,6 +62,7 @@ The `status()` method returns an object with the following properties:
 | `type` | string | Connection type: `wifi`, `cellular`, `ethernet`, or `unknown` |
 | `isExpensive` | boolean | Whether connection is metered (e.g., cellular data) |
 | `isConstrained` | boolean | Whether Low Data Mode is enabled (iOS only) |
+| `error` | string | Present only when the status could not be determined. The other fields are then placeholders, not an observation — treat the connection as unknown rather than offline |
 
 ## Examples
 
@@ -119,7 +120,8 @@ async function checkBeforeDownload() {
 - Requires `ACCESS_NETWORK_STATE` permission (added automatically)
 
 ### iOS
-- Uses `NWPathMonitor` from Network framework
+- Uses one long-lived `NWPathMonitor` from Network framework, started on the first call and answered from its latest path, so calls after the first cost no round trip to the network daemon
+- The first call waits up to 0.5s for the monitor's first path; if none arrives it returns `error` instead of guessing `connected: false`
 - `isConstrained` reflects Low Data Mode setting
 - No special permissions required
 
