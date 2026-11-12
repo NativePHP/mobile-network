@@ -9,6 +9,7 @@
         }
     ],
     "android": {
+        "init_function": "com.nativephp.network.networkInit",
         "min_version": 26,
         "permissions": [
             "android.permission.ACCESS_NETWORK_STATE"
@@ -18,6 +19,7 @@
         }
     },
     "ios": {
+        "init_function": "networkInit",
         "min_version": "18.2",
         "info_plist": {},
         "dependencies": {
@@ -25,5 +27,7 @@
             "pods": []
         }
     },
-    "events": []
+    "events": [
+        "NativePHP\\Network\\Events\\NetworkStatusChanged"
+    ]
 }
