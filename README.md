@@ -4,7 +4,7 @@ Network connectivity status monitoring for NativePHP Mobile applications.
 
 ## Overview
 
-The Network API provides cross-platform network connectivity status detection, including connection type and metered status.
+The Network API provides cross-platform network connectivity status detection, including connection type and metered status, and an event when that status changes.
 
 ## Installation
 
@@ -51,6 +51,33 @@ if (status.connected) {
     console.log('No network connection');
 }
 ```
+
+### Reacting to changes
+
+`NativePHP\Network\Events\NetworkStatusChanged` fires when the device goes online or offline, moves between Wi-Fi and cellular, or becomes metered or constrained. It carries the same four fields as `status()`.
+
+```php
+use Native\Mobile\Attributes\On;
+use NativePHP\Network\Events\NetworkStatusChanged;
+
+#[On(NetworkStatusChanged::class)]
+public function networkChanged(bool $connected, string $type): void
+{
+    $this->offline = ! $connected;
+}
+```
+
+The event implements `BroadcastsGlobally`, so app-wide listeners hear it too:
+
+```php
+Event::listen(NetworkStatusChanged::class, function (NetworkStatusChanged $event) {
+    if ($event->connected) {
+        // Send anything queued while offline...
+    }
+});
+```
+
+The status at launch is the baseline and is not sent, and repeats of the same status are dropped. An event that arrives while no screen is live, such as while the app is in the background, is not replayed, so call `status()` when you need the current value.
 
 ## Response Object
 
@@ -116,11 +143,13 @@ async function checkBeforeDownload() {
 
 ### Android
 - Uses `ConnectivityManager` and `NetworkCapabilities`
+- Follows the default network with `registerDefaultNetworkCallback`, started at launch, for `NetworkStatusChanged`
 - `isConstrained` is always `false` (not applicable)
 - Requires `ACCESS_NETWORK_STATE` permission (added automatically)
 
 ### iOS
 - Uses one long-lived `NWPathMonitor` from Network framework, started on the first call and answered from its latest path, so calls after the first cost no round trip to the network daemon
+- The monitor starts at launch, and each path whose status differs from the last one is sent as `NetworkStatusChanged`
 - The first call waits up to 0.5s for the monitor's first path; if none arrives it returns `error` instead of guessing `connected: false`
 - `isConstrained` reflects Low Data Mode setting
 - No special permissions required

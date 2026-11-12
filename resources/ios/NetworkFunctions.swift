@@ -1,11 +1,70 @@
 import Foundation
 import Network
 
+/// Plugin init function (nativephp.json `ios.init_function`), run once at app
+/// launch. Starts the path monitor so changes are observed from launch rather
+/// than from the first `Network.Status` call.
+func networkInit() {
+    NetworkFunctions.startObserving()
+}
+
 // MARK: - Network Function Namespace
 
 /// Functions related to network connectivity monitoring
 /// Namespace: "Network.*"
 enum NetworkFunctions {
+
+    /// Sent to PHP when the status changes. Matches the PHP class in
+    /// src/Events/NetworkStatusChanged.php.
+    static let statusChangedEvent = "NativePHP\\Network\\Events\\NetworkStatusChanged"
+
+    static func startObserving() {
+        _ = PathObserver.shared
+    }
+
+    // MARK: - Status
+
+    /// The fields `Network.Status` returns and `NetworkStatusChanged` carries.
+    struct NetworkStatus: Equatable {
+        let connected: Bool
+        let type: String
+        let isExpensive: Bool
+        let isConstrained: Bool
+
+        init(path: NWPath) {
+            connected = path.status == .satisfied
+            type = NetworkStatus.interfaceType(of: path)
+            isExpensive = path.isExpensive
+            isConstrained = path.isConstrained
+        }
+
+        var payload: [String: Any] {
+            [
+                "connected": connected,
+                "type": type,
+                "isExpensive": isExpensive,
+                "isConstrained": isConstrained
+            ]
+        }
+
+        /// A path can use several interfaces at once; they are checked in the
+        /// order that answers "what is this connection, to a person".
+        private static func interfaceType(of path: NWPath) -> String {
+            if path.usesInterfaceType(.wifi) {
+                return "wifi"
+            }
+
+            if path.usesInterfaceType(.cellular) {
+                return "cellular"
+            }
+
+            if path.usesInterfaceType(.wiredEthernet) {
+                return "ethernet"
+            }
+
+            return "unknown"
+        }
+    }
 
     // MARK: - Path Observation
 
@@ -20,6 +79,11 @@ enum NetworkFunctions {
     ///
     /// The one call that can arrive before the first path does is the first
     /// one, so that call — and only that call — waits briefly for it.
+    ///
+    /// Every later path whose status differs from the last one is sent to PHP
+    /// as `NetworkStatusChanged`. The first path is the baseline and is not
+    /// sent, and paths that change nothing PHP can see (a new address on the
+    /// same Wi-Fi, say) are dropped.
     private final class PathObserver {
         static let shared = PathObserver()
 
@@ -30,6 +94,9 @@ enum NetworkFunctions {
 
         private var latest: NWPath?
         private var signalled = false
+
+        /// Only touched on `queue`, where path updates arrive one at a time.
+        private var reported: NetworkStatus?
 
         private init() {
             monitor.pathUpdateHandler = { [weak self] path in
@@ -44,6 +111,8 @@ enum NetworkFunctions {
                 if isFirst {
                     self.firstPath.signal()
                 }
+
+                self.reportIfChanged(NetworkStatus(path: path))
             }
 
             monitor.start(queue: queue)
@@ -66,6 +135,20 @@ enum NetworkFunctions {
             defer { lock.unlock() }
 
             return latest
+        }
+
+        private func reportIfChanged(_ status: NetworkStatus) {
+            guard let previous = reported else {
+                reported = status
+                return
+            }
+
+            guard status != previous else { return }
+            reported = status
+
+            DispatchQueue.main.async {
+                LaravelBridge.shared.send?(NetworkFunctions.statusChangedEvent, status.payload)
+            }
         }
     }
 
@@ -96,30 +179,7 @@ enum NetworkFunctions {
                 ]
             }
 
-            return [
-                "connected": path.status == .satisfied,
-                "type": Status.interfaceType(of: path),
-                "isExpensive": path.isExpensive,
-                "isConstrained": path.isConstrained
-            ]
-        }
-
-        /// A path can use several interfaces at once; they are checked in the
-        /// order that answers "what is this connection, to a person".
-        private static func interfaceType(of path: NWPath) -> String {
-            if path.usesInterfaceType(.wifi) {
-                return "wifi"
-            }
-
-            if path.usesInterfaceType(.cellular) {
-                return "cellular"
-            }
-
-            if path.usesInterfaceType(.wiredEthernet) {
-                return "ethernet"
-            }
-
-            return "unknown"
+            return NetworkStatus(path: path).payload
         }
     }
 }

@@ -43,10 +43,17 @@ describe('Plugin Manifest', function () {
         }
     });
 
-    it('declares no events', function () {
+    it('declares the NetworkStatusChanged event', function () {
         $manifest = json_decode(file_get_contents($this->manifestPath), true);
 
-        expect($manifest['events'])->toBeArray()->toBeEmpty();
+        expect($manifest['events'])->toBe(['NativePHP\\Network\\Events\\NetworkStatusChanged']);
+    });
+
+    it('starts observing at launch on both platforms', function () {
+        $manifest = json_decode(file_get_contents($this->manifestPath), true);
+
+        expect($manifest['ios']['init_function'])->toBe('networkInit');
+        expect($manifest['android']['init_function'])->toBe('com.nativephp.network.networkInit');
     });
 
     it('requests the ACCESS_NETWORK_STATE android permission', function () {
@@ -82,6 +89,23 @@ describe('Native Code', function () {
                 expect($swiftContent)->toContain('class '.end($parts));
             }
         }
+    });
+
+    it('defines the init functions and sends the event the manifest declares', function () {
+        $manifest = json_decode(file_get_contents($this->manifestPath), true);
+
+        $kotlinContent = implode('', array_map('file_get_contents', glob($this->pluginPath.'/resources/android/*.kt')));
+        $swiftContent = implode('', array_map('file_get_contents', glob($this->pluginPath.'/resources/ios/*.swift')));
+
+        $androidInit = explode('.', $manifest['android']['init_function']);
+        expect($kotlinContent)->toContain('package '.implode('.', array_slice($androidInit, 0, -1)));
+        expect($kotlinContent)->toContain('fun '.end($androidInit).'(context: Context)');
+        expect($swiftContent)->toContain('func '.$manifest['ios']['init_function'].'()');
+
+        // Kotlin and Swift string literals escape the backslashes the same way.
+        $literal = '"'.str_replace('\\', '\\\\', $manifest['events'][0]).'"';
+        expect($kotlinContent)->toContain($literal);
+        expect($swiftContent)->toContain($literal);
     });
 });
 
