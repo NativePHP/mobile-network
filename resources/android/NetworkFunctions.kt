@@ -32,10 +32,11 @@ object NetworkFunctions {
     private const val STATUS_CHANGED_EVENT = "NativePHP\\Network\\Events\\NetworkStatusChanged"
 
     /**
-     * How long a loss waits before PHP hears it. When Wi-Fi drops, Android
-     * reports the loss a few milliseconds before it makes mobile data the
-     * default network, so an immediate report would flash "offline" on every
-     * handover. A replacement network within this window cancels the report.
+     * How long a disconnected status waits before PHP hears it. When Wi-Fi
+     * drops or stops reaching the internet, Android reports that a few
+     * milliseconds before it makes mobile data the default network, so an
+     * immediate report would flash "offline" on every handover. A connected
+     * status within this window cancels the report.
      */
     private const val LOSS_GRACE_MS = 1_000L
 
@@ -43,7 +44,10 @@ object NetworkFunctions {
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    private val reportLoss = Runnable { reportIfChanged(statusOf(null)) }
+    /** The disconnected status waiting out LOSS_GRACE_MS. Only touched on the main thread. */
+    private var pendingLoss: Map<String, Any>? = null
+
+    private val reportLoss = Runnable { pendingLoss?.let { reportIfChanged(it) } }
 
     /** The status PHP last heard about. Only touched on the main thread. */
     private var reported: Map<String, Any>? = null
@@ -67,13 +71,11 @@ object NetworkFunctions {
         // replaced, so the status is computed from what the callback is given.
         val networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
-                mainHandler.removeCallbacks(reportLoss)
-                reportIfChanged(statusOf(capabilities))
+                update(statusOf(capabilities))
             }
 
             override fun onLost(network: Network) {
-                mainHandler.removeCallbacks(reportLoss)
-                mainHandler.postDelayed(reportLoss, LOSS_GRACE_MS)
+                update(statusOf(null))
             }
         }
 
@@ -85,6 +87,18 @@ object NetworkFunctions {
             callback = networkCallback
         } catch (e: Exception) {
             Log.e(TAG, "Could not observe network changes: ${e.message}", e)
+        }
+    }
+
+    /** Report a connected status now, and a disconnected one after LOSS_GRACE_MS. */
+    private fun update(status: Map<String, Any>) {
+        mainHandler.removeCallbacks(reportLoss)
+
+        if (status["connected"] == true) {
+            reportIfChanged(status)
+        } else {
+            pendingLoss = status
+            mainHandler.postDelayed(reportLoss, LOSS_GRACE_MS)
         }
     }
 
@@ -117,8 +131,11 @@ object NetworkFunctions {
             else -> "unknown"
         }
 
+        // VALIDATED means Android reached the internet through this network, the
+        // same check behind the status bar's no-internet mark. Without it the
+        // network is still connecting, or is a captive portal or has no internet.
         return mapOf(
-            "connected" to true,
+            "connected" to capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),
             "type" to connectionType,
             "isExpensive" to !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
             "isConstrained" to false
@@ -129,7 +146,7 @@ object NetworkFunctions {
      * Get the current network connection status
      * Parameters: None
      * Returns:
-     *   - connected: boolean - Whether device has network connectivity
+     *   - connected: boolean - Whether the default network reaches the internet (Android has validated it)
      *   - type: string - Connection type (wifi, cellular, ethernet, unknown)
      *   - isExpensive: boolean - Whether connection is metered
      *   - isConstrained: boolean - Not applicable on Android (always false for compatibility)

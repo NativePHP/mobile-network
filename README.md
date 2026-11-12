@@ -85,7 +85,7 @@ The `status()` method returns an object with the following properties:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `connected` | boolean | Whether device has network connectivity |
+| `connected` | boolean | Whether device has network connectivity. On Android the network must also have reached the internet, so a Wi-Fi sign-in page (captive portal) reads `false`; see Platform Behavior |
 | `type` | string | Connection type: `wifi`, `cellular`, `ethernet`, or `unknown` |
 | `isExpensive` | boolean | Whether connection is metered (e.g., cellular data) |
 | `isConstrained` | boolean | Whether Low Data Mode is enabled (iOS only) |
@@ -144,7 +144,8 @@ async function checkBeforeDownload() {
 ### Android
 - Uses `ConnectivityManager` and `NetworkCapabilities`
 - Follows the default network with `registerDefaultNetworkCallback`, started at launch, for `NetworkStatusChanged`
-- A loss is reported after 1s, and not at all if another network becomes the default in that time, so a Wi-Fi to mobile data handover doesn't report a brief disconnect
+- `connected` requires `NET_CAPABILITY_VALIDATED`: Android has reached the internet through the network, the same check behind the status bar's no-internet mark. A Wi-Fi network behind a sign-in page (captive portal) or without internet reads `connected: false` with `type: wifi`, and a network that has just joined reads `connected: false` for the second or two Android takes to validate it. A network whose firewall blocks Android's connectivity check never validates, so it reads `connected: false` throughout
+- A disconnect is reported after 1s, and not at all if a connected network becomes the default in that time, so a Wi-Fi to mobile data handover doesn't report a brief disconnect
 - `isConstrained` is always `false` (not applicable)
 - Requires `ACCESS_NETWORK_STATE` permission (added automatically)
 

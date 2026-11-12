@@ -55,7 +55,7 @@ if (status) {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| connected | bool | Device network connection state |
+| connected | bool | Device network connection state (on Android, `false` until the network reaches the internet, so a captive portal is `false`) |
 | type | string | Connection type: "wifi", "cellular", "ethernet", "unknown" |
 | isExpensive | bool | Metered/cellular connection (iOS only; false on Android) |
 | isConstrained | bool | Low Data Mode status (iOS only; false on Android) |
