@@ -4,7 +4,7 @@ Network connectivity status monitoring for NativePHP Mobile applications.
 
 ## Overview
 
-The Network API provides cross-platform network connectivity status detection, including connection type and metered status.
+The Network API provides cross-platform network connectivity status detection, including connection type and metered status, and an event when that status changes.
 
 ## Installation
 
@@ -52,16 +52,44 @@ if (status.connected) {
 }
 ```
 
+### Reacting to changes
+
+`NativePHP\Network\Events\NetworkStatusChanged` fires when the device goes online or offline, moves between Wi-Fi and cellular, or becomes metered or constrained. It carries the same four fields as `status()`.
+
+```php
+use Native\Mobile\Attributes\On;
+use NativePHP\Network\Events\NetworkStatusChanged;
+
+#[On(NetworkStatusChanged::class)]
+public function networkChanged(bool $connected, string $type): void
+{
+    $this->offline = ! $connected;
+}
+```
+
+The event implements `BroadcastsGlobally`, so app-wide listeners hear it too:
+
+```php
+Event::listen(NetworkStatusChanged::class, function (NetworkStatusChanged $event) {
+    if ($event->connected) {
+        // Send anything queued while offline...
+    }
+});
+```
+
+The status at launch is the baseline and is not sent, and repeats of the same status are dropped. An event that arrives while no screen is live, such as while the app is in the background, is not replayed, so call `status()` when you need the current value.
+
 ## Response Object
 
 The `status()` method returns an object with the following properties:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `connected` | boolean | Whether device has network connectivity |
+| `connected` | boolean | Whether device has network connectivity. On Android the network must also have reached the internet, so a Wi-Fi sign-in page (captive portal) reads `false`; see Platform Behavior |
 | `type` | string | Connection type: `wifi`, `cellular`, `ethernet`, or `unknown` |
 | `isExpensive` | boolean | Whether connection is metered (e.g., cellular data) |
 | `isConstrained` | boolean | Whether Low Data Mode is enabled (iOS only) |
+| `error` | string | Present only when the status could not be determined. The other fields are then placeholders, not an observation — treat the connection as unknown rather than offline |
 
 ## Examples
 
@@ -115,11 +143,16 @@ async function checkBeforeDownload() {
 
 ### Android
 - Uses `ConnectivityManager` and `NetworkCapabilities`
+- Follows the default network with `registerDefaultNetworkCallback`, started at launch, for `NetworkStatusChanged`
+- `connected` requires `NET_CAPABILITY_VALIDATED`: Android has reached the internet through the network, the same check behind the status bar's no-internet mark. A Wi-Fi network behind a sign-in page (captive portal) or without internet reads `connected: false` with `type: wifi`, and a network that has just joined reads `connected: false` for the second or two Android takes to validate it. A network whose firewall blocks Android's connectivity check never validates, so it reads `connected: false` throughout
+- A disconnect is reported after 1s, and not at all if a connected network becomes the default in that time, so a Wi-Fi to mobile data handover doesn't report a brief disconnect
 - `isConstrained` is always `false` (not applicable)
 - Requires `ACCESS_NETWORK_STATE` permission (added automatically)
 
 ### iOS
-- Uses `NWPathMonitor` from Network framework
+- Uses one long-lived `NWPathMonitor` from Network framework, started on the first call and answered from its latest path, so calls after the first cost no round trip to the network daemon
+- The monitor starts at launch, and each path whose status differs from the last one is sent as `NetworkStatusChanged`
+- The first call waits up to 0.5s for the monitor's first path; if none arrives it returns `error` instead of guessing `connected: false`
 - `isConstrained` reflects Low Data Mode setting
 - No special permissions required
 

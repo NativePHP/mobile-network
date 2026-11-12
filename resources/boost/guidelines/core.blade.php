@@ -18,6 +18,23 @@ if ($status) {
 </code-snippet>
 @endverbatim
 
+### Reacting to changes
+
+@verbatim
+<code-snippet name="Network Status Changed" lang="php">
+use Native\Mobile\Attributes\On;
+use NativePHP\Network\Events\NetworkStatusChanged;
+
+#[On(NetworkStatusChanged::class)]
+public function networkChanged(bool $connected, string $type): void
+{
+    $this->offline = ! $connected;
+}
+
+// Or app-wide: Event::listen(NetworkStatusChanged::class, fn ($e) => ...);
+</code-snippet>
+@endverbatim
+
 ### JavaScript Usage (Vue/React/Inertia)
 
 @verbatim
@@ -38,13 +55,13 @@ if (status) {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| connected | bool | Device network connection state |
+| connected | bool | Device network connection state (on Android, `false` until the network reaches the internet, so a captive portal is `false`) |
 | type | string | Connection type: "wifi", "cellular", "ethernet", "unknown" |
 | isExpensive | bool | Metered/cellular connection (iOS only; false on Android) |
 | isConstrained | bool | Low Data Mode status (iOS only; false on Android) |
 
 ### Notes
 
-- Returns current state only; not a real-time stream
-- No event system - must call directly or implement periodic checks
+- `status()` returns the current state; `NetworkStatusChanged` fires when it changes
+- The status at launch is not sent as an event, and an event missed while the app is in the background is not replayed, so call `status()` when you need the current value
 - Requires `network_state` permission (enabled by default)

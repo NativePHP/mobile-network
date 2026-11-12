@@ -28,5 +28,6 @@ abstract class TestCase extends BaseTestCase
         $app['config']->set('nativephp.version', '1.0.0');
         $app['config']->set('nativephp.version_code', 1);
         $app['config']->set('app.name', 'Test App');
+        $app['view']->addLocation(__DIR__.'/Fixtures/views');
     }
 }

@@ -11,7 +11,7 @@
     ],
     "require": {
         "php": "^8.2",
-        "nativephp/mobile": "^3.0 || ^4.0"
+        "nativephp/mobile": "^4.0"
     },
     "require-dev": {
         "orchestra/testbench": "^10.0",
@@ -27,7 +27,8 @@
     },
     "autoload": {
         "psr-4": {
-            "Native\\Mobile\\Providers\\": "src/"
+            "Native\\Mobile\\Providers\\": "src/",
+            "NativePHP\\Network\\Events\\": "src/Events/"
         }
     },
     "autoload-dev": {
