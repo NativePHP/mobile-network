@@ -31,7 +31,19 @@ object NetworkFunctions {
     /** Matches the PHP class in src/Events/NetworkStatusChanged.php. */
     private const val STATUS_CHANGED_EVENT = "NativePHP\\Network\\Events\\NetworkStatusChanged"
 
+    /**
+     * How long a loss waits before PHP hears it. When Wi-Fi drops, Android
+     * reports the loss a few milliseconds before it makes mobile data the
+     * default network, so an immediate report would flash "offline" on every
+     * handover. A replacement network within this window cancels the report.
+     */
+    private const val LOSS_GRACE_MS = 1_000L
+
     private var callback: ConnectivityManager.NetworkCallback? = null
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private val reportLoss = Runnable { reportIfChanged(statusOf(null)) }
 
     /** The status PHP last heard about. Only touched on the main thread. */
     private var reported: Map<String, Any>? = null
@@ -50,18 +62,18 @@ object NetworkFunctions {
         val connectivityManager = context.applicationContext
             .getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
 
-        val mainHandler = Handler(Looper.getMainLooper())
-
         // Callbacks hand over the default network's capabilities. Reading
         // activeNetwork from inside a callback can return the network being
         // replaced, so the status is computed from what the callback is given.
         val networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+                mainHandler.removeCallbacks(reportLoss)
                 reportIfChanged(statusOf(capabilities))
             }
 
             override fun onLost(network: Network) {
-                reportIfChanged(statusOf(null))
+                mainHandler.removeCallbacks(reportLoss)
+                mainHandler.postDelayed(reportLoss, LOSS_GRACE_MS)
             }
         }
 

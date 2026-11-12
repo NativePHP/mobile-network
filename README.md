@@ -144,6 +144,7 @@ async function checkBeforeDownload() {
 ### Android
 - Uses `ConnectivityManager` and `NetworkCapabilities`
 - Follows the default network with `registerDefaultNetworkCallback`, started at launch, for `NetworkStatusChanged`
+- A loss is reported after 1s, and not at all if another network becomes the default in that time, so a Wi-Fi to mobile data handover doesn't report a brief disconnect
 - `isConstrained` is always `false` (not applicable)
 - Requires `ACCESS_NETWORK_STATE` permission (added automatically)
 
